@@ -142,8 +142,9 @@ export default function GraphView({
         'text-halign':             'center',
         'text-margin-y':           '5px',
         'text-background-color':   '#080f1a',
-        'text-background-opacity': '0.85',
-        'text-background-padding': '2px',
+        'text-background-opacity': 0.85,
+        'text-background-padding': 3,
+        'text-background-shape':   'roundrectangle',
         'text-wrap':               'none',
       }
     },
@@ -154,6 +155,112 @@ export default function GraphView({
         'width':  '18px',
         'height': '18px',
       }
+    },
+    // Hover label overlay
+    {
+      selector: 'node.hover-label',
+      style: {
+        'label': 'data(label)',
+        'z-index': 9999,
+      }
+    },
+    // ── Simulation Blast Radius ────────────────────
+    {
+      selector: 'node.blast-seed',
+      style: {
+        'background-color': '#60a5fa',
+        'border-color':     '#2563eb',
+        'border-width':     '3px',
+        'border-opacity':   1,
+        'opacity':          1,
+        'underlay-color':   '#3b82f6',
+        'underlay-padding': 14,
+        'underlay-opacity': 0.9,
+        'underlay-shape':   'ellipse',
+        'width':            '24px',
+        'height':           '24px',
+        'transition-property': 'underlay-padding, underlay-opacity',
+        'transition-duration': '900ms',
+        'transition-timing-function': 'ease-in-out',
+        'z-index': 900,
+      }
+    },
+    {
+      selector: 'node.pulse-active',
+      style: {
+        'underlay-padding': 20,
+        'underlay-opacity': 1,
+      }
+    },
+    {
+      selector: 'node.blast-seed[type = "class"]',
+      style: {
+        'width': '26px',
+        'height': '26px',
+      }
+    },
+    {
+      selector: 'node.blast-affected-red',
+      style: {
+        'background-color': '#ef4444',
+        'border-color':     '#ef4444',
+        'border-width':     '3px',
+        'border-opacity':   1,
+        'opacity':          1,
+        'underlay-color':   '#ef4444',
+        'underlay-padding': 8,
+        'underlay-opacity': 0.7,
+        'underlay-shape':   'ellipse',
+        'width':            '16px',
+        'height':           '16px',
+        'z-index': 800,
+      }
+    },
+    {
+      selector: 'node.blast-affected-red[type = "class"]',
+      style: { 'width': '18px', 'height': '18px' }
+    },
+    {
+      selector: 'node.blast-affected-amber',
+      style: {
+        'background-color': '#f59e0b',
+        'border-color':     '#f59e0b',
+        'border-width':     '3px',
+        'border-opacity':   1,
+        'opacity':          1,
+        'underlay-color':   '#f59e0b',
+        'underlay-padding': 8,
+        'underlay-opacity': 0.7,
+        'underlay-shape':   'ellipse',
+        'width':            '16px',
+        'height':           '16px',
+        'z-index': 800,
+      }
+    },
+    {
+      selector: 'node.blast-affected-amber[type = "class"]',
+      style: { 'width': '18px', 'height': '18px' }
+    },
+    {
+      selector: 'node.blast-affected-green',
+      style: {
+        'background-color': '#22c55e',
+        'border-color':     '#22c55e',
+        'border-width':     '3px',
+        'border-opacity':   1,
+        'opacity':          1,
+        'underlay-color':   '#22c55e',
+        'underlay-padding': 8,
+        'underlay-opacity': 0.7,
+        'underlay-shape':   'ellipse',
+        'width':            '16px',
+        'height':           '16px',
+        'z-index': 800,
+      }
+    },
+    {
+      selector: 'node.blast-affected-green[type = "class"]',
+      style: { 'width': '18px', 'height': '18px' }
     },
     // ── Selection / highlight ─────────────────────
     {
@@ -286,16 +393,17 @@ export default function GraphView({
         if (evt.target === cy) onNodeClick('')
       })
 
-      // Hover: show label on child nodes
-      cy.on('mouseover', 'node[type != "module"]', (evt: any) => {
-        evt.target.style('label', evt.target.data('label'))
+      // Hover: show label on child nodes, with high z-index
+      cy.on('mouseover', 'node', (evt: any) => {
+        const n = evt.target
+        if (n.data('type') !== 'module') {
+          n.addClass('hover-label')
+        }
       })
 
-      cy.on('mouseout', 'node[type != "module"]', (evt: any) => {
+      cy.on('mouseout', 'node', (evt: any) => {
         const n = evt.target
-        if (!n.selected() && !n.hasClass('highlighted')) {
-          n.style('label', '')
-        }
+        n.removeClass('hover-label')
       })
 
       cyRef.current = cy
@@ -325,16 +433,10 @@ export default function GraphView({
     const cy = cyRef.current
 
     // Reset all visual classes and overrides
-    cy.elements().removeClass('highlighted dimmed blast-red blast-amber blast-green blast-seed')
-    cy.nodes().removeStyle(
-      'background-color border-color border-width border-opacity opacity'
-    )
+    cy.elements().removeClass('highlighted dimmed blast-seed blast-affected-red blast-affected-amber blast-affected-green pulse-active hover-label')
+    cy.nodes().removeStyle('opacity')
 
-    const RISK_COLORS: Record<string, string> = {
-      red:   '#ef4444',
-      amber: '#f59e0b',
-      green: '#22c55e',
-    }
+    let pulseInterval: any;
 
     // ── Blast radius mode ────────────────────────────────
     if (blastAffected.length > 0) {
@@ -351,49 +453,56 @@ export default function GraphView({
         const riskLabel = affectedMap.get(nid)
 
         if (riskLabel) {
-          // Affected node — color by risk
-          const color = RISK_COLORS[riskLabel] ?? '#94a3b8'
-          node.style({
-            'background-color': color,
-            'border-color':     color,
-            'border-width':     '3px',
-            'border-opacity':   '1',
-            'opacity':          '1',
-          })
-          // Show label
-          node.style('label', node.data('label'))
+          // Affected node — apply risk-specific class
+          if (riskLabel === 'red') node.addClass('blast-affected-red')
+          else if (riskLabel === 'amber') node.addClass('blast-affected-amber')
+          else node.addClass('blast-affected-green')
+          
+          // CRITICAL: Ensure parent module is NOT dimmed
+          const parent = node.parent()
+          if (parent.length) {
+            parent.style({ 'opacity': '1' })
+          }
         } else if (seedIds.has(nid)) {
-          // Seed node — blue glow
-          node.style({
-            'background-color': '#3b82f6',
-            'border-color':     '#60a5fa',
-            'border-width':     '4px',
-            'border-opacity':   '1',
-            'opacity':          '1',
-          })
-          node.style('label', node.data('label'))
+          // Seed node — dynamic pulsing blue glow
+          node.addClass('blast-seed')
+
+          const parent = node.parent()
+          if (parent.length) {
+            parent.style({ 'opacity': '1' })
+          }
         } else {
           // Unaffected node — dim it
-          node.style({ 'opacity': '0.15' })
+          if (node.style('opacity') !== '1') {
+            node.style({ 'opacity': '0.15' })
+          }
         }
       })
 
       // Dim all edges
       cy.edges().style({ 'opacity': '0.06' })
-      return
+
+      // Animate seed nodes safely using a single interval
+      pulseInterval = setInterval(() => {
+        if (cyRef.current) cyRef.current.nodes('.blast-seed').toggleClass('pulse-active')
+      }, 900)
+
+    } else {
+      // ── Normal highlight mode (search / selection) ───────
+      if (highlightIds && highlightIds.size > 0) {
+        cy.nodes().forEach((n: any) => {
+          if (highlightIds.has(n.id())) n.addClass('highlighted')
+          else n.addClass('dimmed')
+        })
+        cy.edges().addClass('dimmed')
+      }
     }
 
-    // ── Normal highlight mode (search / selection) ───────
-    if (!selectedId && !highlightIds?.size) return
-
-    if (highlightIds && highlightIds.size > 0) {
-      cy.nodes().forEach((n: any) => {
-        if (highlightIds.has(n.id())) n.addClass('highlighted')
-        else n.addClass('dimmed')
-      })
-      cy.edges().addClass('dimmed')
-      return
+    // Cleanup interval to prevent overlapping animations
+    return () => {
+      if (pulseInterval) clearInterval(pulseInterval)
     }
+
 
     if (selectedId) {
       const sel = cy.getElementById(selectedId)

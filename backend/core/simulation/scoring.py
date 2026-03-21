@@ -16,25 +16,27 @@ def score_node(
 ) -> float:
     """
     Risk score formula [0.0 - 1.0]:
-    - Closer hop = higher risk
-    - Dynamic paths always amber floor (0.35)
-    - Untested nodes get risk boost
-    - High call frequency increases risk
+    hop 1 → red   (0.75+)
+    hop 2 → amber (0.35-0.64)
+    hop 3 → green (0.10-0.34)
+    Dynamic paths get amber floor (0.40)
     """
-    # Base from hop distance (exponential decay)
-    base = math.exp(-0.5 * (hop_distance - 1))
+    # Hard tiers by hop distance
+    if hop_distance == 1:
+        base = 0.80
+    elif hop_distance == 2:
+        base = 0.45
+    else:
+        base = 0.15
 
-    # Call frequency boost (normalized, capped at 2x)
-    freq_factor = min(1.0 + (call_frequency - 1) * 0.1, 2.0)
+    # Test coverage reduces risk slightly
+    test_factor = 1.0 if not has_tests else 0.85
 
-    # Test coverage factor
-    test_factor = 1.0 if not has_tests else 0.7
+    score = base * test_factor
 
-    score = base * freq_factor * test_factor
-
-    # Dynamic path floor
+    # Dynamic path floor — uncertain but not safe
     if is_dynamic_path:
-        score = max(score, 0.35)
+        score = max(score, 0.40)
 
     return min(round(score, 3), 1.0)
 

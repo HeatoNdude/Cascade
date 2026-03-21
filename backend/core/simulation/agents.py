@@ -154,36 +154,22 @@ async def run_synthesis_agent(
     green_nodes = [n for n in state.affected_nodes if n.risk_label == "green"]
 
     context = {
-        "change":       state.seed_event.description,
-        "change_type":  state.seed_event.change_type,
-        "seed_nodes":   state.seed_node_ids,
+        "change":         state.seed_event.description,
         "total_affected": len(state.affected_nodes),
         "high_risk": [
-            {"name": n.name, "file": n.file, "reason": n.break_reason}
-            for n in red_nodes[:8]
+            {"name": n.name, "file": n.file.split("/")[-1]}
+            for n in red_nodes[:5]
         ],
         "medium_risk": [
-            {"name": n.name, "file": n.file, "reason": n.break_reason}
-            for n in amber_nodes[:6]
+            {"name": n.name, "file": n.file.split("/")[-1]}
+            for n in amber_nodes[:5]
         ],
-        "at_risk_tests": [
-            {"name": t["name"], "file": t["file"]}
-            for t in state.affected_tests[:8]
-        ],
-        "historical_precedents": state.history_notes[:4],
+        "tests_at_risk": [t["name"] for t in state.affected_tests[:5]],
     }
 
-    system = """You are a senior software engineer writing a concise impact report
-for a proposed code change. You receive structured metadata about affected code.
-Write a clear markdown report with these sections:
-## Summary
-## High Risk Breaks  
-## Tests at Risk
-## Historical Precedent
-## Recommendation
-
-Be specific. Cite file names and function names. Be honest about uncertainty.
-Keep total length under 400 words."""
+    system = """Code change impact analyst. Write a SHORT markdown report.
+Use these sections only: ## Summary, ## High Risk, ## Tests at Risk, ## Recommendation
+Max 200 words. Be direct. Cite function names and files. No preamble."""
 
     user = f"Impact analysis data:\n{json.dumps(context, indent=2)}"
 
@@ -197,7 +183,7 @@ Keep total length under 400 words."""
                         {"role": "system", "content": system},
                         {"role": "user",   "content": user}
                     ],
-                    "max_tokens": 700,
+                    "max_tokens": 400,
                     "temperature": 0.2,
                 }
             )
@@ -212,21 +198,51 @@ Keep total length under 400 words."""
             "",
             f"**{state.total_breaks} functions at risk** across "
             f"{len(state.affected_nodes)} total affected nodes.",
-            "",
-            "### High Risk",
         ]
-        for n in red_nodes[:5]:
-            lines.append(f"- **{n.name}** `{n.file}` — {n.break_reason}")
-        lines.extend(["", "### Tests at Risk"])
-        for t in state.affected_tests[:5]:
-            lines.append(f"- `{t['name']}` in `{t['file']}`")
+
+        if red_nodes:
+            lines.extend(["", "### 🔴 High Risk (direct breaks)"])
+            for n in red_nodes[:8]:
+                lines.append(
+                    f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
+                    f" — {n.break_reason}"
+                )
+
+        if amber_nodes:
+            lines.extend(["", "### 🟡 Medium Risk (indirect breaks)"])
+            for n in amber_nodes[:8]:
+                lines.append(
+                    f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
+                    f" — {n.break_reason}"
+                )
+
+        if green_nodes:
+            lines.extend([
+                "",
+                f"### 🟢 Low Risk ({len(green_nodes)} nodes — "
+                f"unlikely to break but in dependency chain)"
+            ])
+
+        if state.affected_tests:
+            lines.extend(["", "### 🧪 Tests at Risk"])
+            for t in state.affected_tests[:8]:
+                lines.append(f"- `{t['name']}` in `{t['file']}`")
+
         if state.history_notes:
-            lines.extend(["", "### Historical Precedent"])
+            lines.extend(["", "### 📜 Historical Precedent"])
             for h in state.history_notes[:3]:
                 lines.append(
                     f"- `{h['hash']}` {h['date']} by {h['author']}: "
-                    f"{h['message'][:80]}"
+                    f"{h['message'][:100]}"
                 )
+
+        lines.extend([
+            "",
+            "### 💡 Recommendation",
+            f"Update all {len(red_nodes) + len(amber_nodes)} call sites "
+            f"before merging. Run the full test suite after renaming."
+        ])
+
         state.report_markdown = "\n".join(lines)
         print(f"[SynthesisAgent] LLM failed ({e}), used fallback report.")
 
