@@ -1,7 +1,39 @@
-# Tauri + React + Typescript
+# Cascade
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Cascade is a powerful, Tauri-based interactive code graph visualization tool designed to help developers explore and understand complex codebases.
 
-## Recommended IDE Setup
+## Features
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- **Interactive Graph Visualization**: Visualize code structures and dependencies using [Cytoscape.js](https://js.cytoscape.org/).
+- **Tauri Optimized**: Native-speed performance with a lightweight footprint.
+- **Modern UI**: Built with React, Next.js, and Lucide for a professional experience.
+
+## Tech Stack
+
+- **Frontend**: [Next.js](https://nextjs.org/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/)
+- **Backend**: [Tauri](https://tauri.app/) (Rust)
+- **Visualization**: [Cytoscape.js](https://js.cytoscape.org/)
+- **Styling**: Tailwind CSS / Vanilla CSS
+
+## Development
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (latest LTS recommended)
+- [Rust](https://www.rust-lang.org/) (for Tauri backend)
+
+### Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+### Build for Production
+
+```bash
+npm run tauri build
+```
+
+---
+Built with ❤️ by Cascade team.
