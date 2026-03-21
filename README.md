@@ -1,39 +1,130 @@
-# Cascade
+<h1 align="center">
+  <br>
+  🌊 Cascade
+  <br>
+</h1>
 
-Cascade is a powerful, Tauri-based interactive code graph visualization tool designed to help developers explore and understand complex codebases.
+<h4 align="center">AI-Powered Code Intelligence and Blast Radius Simulation Engine</h4>
 
-## Features
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#architecture-and-stack">Architecture</a> •
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#usage">Usage</a>
+</p>
 
-- **Interactive Graph Visualization**: Visualize code structures and dependencies using [Cytoscape.js](https://js.cytoscape.org/).
-- **Tauri Optimized**: Native-speed performance with a lightweight footprint.
-- **Modern UI**: Built with React, Next.js, and Lucide for a professional experience.
+## Overview
 
-## Tech Stack
+**Cascade** is a next-generation desktop application designed to help developers visualize, understand, and safely modify complex codebases. By parsing your entire repository into a dynamic dependency graph and indexing it with vector embeddings, Cascade allows you to semantically explore your codebase via **God View** and accurately simulate the cascading impacts of code changes (the **Blast Radius**) through intelligent traversal and AI synthesis.
 
-- **Frontend**: [Next.js](https://nextjs.org/), [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/)
-- **Backend**: [Tauri](https://tauri.app/) (Rust)
-- **Visualization**: [Cytoscape.js](https://js.cytoscape.org/)
-- **Styling**: Tailwind CSS / Vanilla CSS
+---
 
-## Development
+## ⚡ Features
+
+* **Interactive God View 🌌**  
+  An interactive, zoomed semantic graph visualization of your repository's architecture. View how modules, functions, and classes interconnect, with automatic clustering and layout optimization.
+
+* **AST-Powered Graph Engine 🌲**  
+  Deeply parses the Python and TypeScript source code using `tree-sitter`, resolving structural edges (`contains`), dynamic dependencies (`calls`), and imports down to the function level.
+
+* **Semantic Code Search 🧠**  
+  Integration with FAISS and `sentence-transformers` automatically indexes codebase text and docstrings, allowing deep semantic search over your codebase rather than just regex keyword matching.
+
+* **Simulation & Blast Radius Engine 💥**  
+  Query a "What if?" scenario (e.g., *"what if we rename parse_file to parse_source_file?"*). Cascade traverses the dependency tree up to specific graph depths, cleanly categorizing affected components into 🔴 High, 🟡 Medium, and 🟢 Low Risks.
+
+* **AI Synthesis 🤖**  
+  Integration with local LLM (`llama.cpp` with GPU acceleration) synthesizes traversing reports into human-readable action items, highlighting exact downstream impacts and required fixes before you make a change.
+
+---
+
+## 🏗️ Architecture and Stack
+
+Cascade is built with a highly decoupled client/server architecture:
+
+### Frontend (Desktop Client)
+* **Framework**: React / Next.js
+* **Styling**: Tailwind CSS
+* **Desktop Wrapper**: Tauri (Rust) for native lightweight OS integration
+* **Graph Rendering**: Cytoscape / fcose (for God View interactive layouts)
+
+### Backend (Graph & API Engine)
+* **Framework**: FastAPI (Python / Uvicorn)
+* **Graph Processing**: NetworkX
+* **Parsing**: tree-sitter (for Python/TS AST generation)
+* **Embeddings**: FAISS & sentence-transformers
+* **LLM Backend**: llama-cpp-python (CUDA-enabled)
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
+* Rust and Cargo (for Tauri)
+* Node.js (v18+) and npm
+* Python 3.11+
+* (Optional) NVIDIA GPU + CUDA Toolkit for local LLM acceleration
 
-- [Node.js](https://nodejs.org/) (latest LTS recommended)
-- [Rust](https://www.rust-lang.org/) (for Tauri backend)
+### Installation
 
-### Run locally
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/HeatoNdude/Cascade.git
+   cd Cascade
+   ```
 
+2. **Set up the Backend:**
+   ```bash
+   cd backend
+   python -m venv .venv
+   .\.venv\Scripts\activate   # On Windows
+   pip install -r requirements.txt
+   ```
+
+3. **Install Frontend Dependencies:**
+   ```bash
+   cd ..
+   npm install
+   ```
+
+### Running the Application
+
+Cascade requires both the backend API server and the Tauri frontend to be running simultaneously.
+
+**Terminal 1: Start the Backend server**
 ```bash
-npm install
-npm run dev
+cd backend
+.\.venv\Scripts\activate
+uvicorn main:app --host 127.0.0.1 --port 5001 --reload
 ```
 
-### Build for Production
-
+**Terminal 2: Start the Frontend App**
 ```bash
-npm run tauri build
+# In the repository root
+npm run tauri dev
 ```
 
 ---
-Built with ❤️.
+
+## 💡 Usage
+
+### Loading a Repository
+1. Open Cascade and navigate to the Repo Picker.
+2. Select a targeted folder directory on your machine.
+3. Cascade will begin the "Indexing" phase. This will build the initial Git Memory, parse the Abstract Syntax Trees, generate the vector embeddings in the `backend/cache/` directory, and construct the Graph Builder JSON structure.
+
+### Exploring the Graph
+* Jump into **God View** to see a bird's-eye map of module nodes.
+* Scroll to zoom in and dynamically expose function and class-level nodes alongside their labels.
+* Mouse hover over nodes to use the Node Inspector to see their underlying code, Git history, author, and docstrings.
+
+### Running a Simulation
+1. Open the Action / Query bar in God View.
+2. Type an intent, such as: `what if we rename parse_file to parse_source_file`.
+3. Hit enter and watch the SSE stream calculate the target nodes, trace upstream to pinpoint module callers, calculate hop distances, format the Blast Radius, and optionally query the local LLM to output a precise refactor protocol indicating what will break.
+
+---
+
+<p align="center">
+  Built with ❤️ and AI.
+</p>
