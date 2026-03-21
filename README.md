@@ -36,4 +36,4 @@ npm run tauri build
 ```
 
 ---
-Built with ❤️ by Cascade team.
+Built with ❤️.
