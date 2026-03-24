@@ -298,6 +298,7 @@ async def simulate(req: SimulateRequest):
             repo_path=repo_path,
             G=cascade.builder.G,
             llama_url=llama_url,
+            vector_index=cascade.vector,
         ):
             yield chunk
 

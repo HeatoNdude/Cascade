@@ -174,7 +174,7 @@ Max 200 words. Be direct. Cite function names and files. No preamble."""
     user = f"Impact analysis data:\n{json.dumps(context, indent=2)}"
 
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(
                 f"{llama_url}/v1/chat/completions",
                 json={
@@ -183,14 +183,16 @@ Max 200 words. Be direct. Cite function names and files. No preamble."""
                         {"role": "system", "content": system},
                         {"role": "user",   "content": user}
                     ],
-                    "max_tokens": 400,
+                    "max_tokens": 1000,
                     "temperature": 0.2,
                 }
             )
             resp.raise_for_status()
-            state.report_markdown = (
-                resp.json()["choices"][0]["message"]["content"].strip()
-            )
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            state.report_markdown = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
+            
+            if not state.report_markdown:
+                raise ValueError("LLM returned empty response")
     except Exception as e:
         # Fallback: generate report from structured data
         lines = [

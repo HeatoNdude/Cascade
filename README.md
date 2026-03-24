@@ -104,8 +104,20 @@ uvicorn main:app --host 127.0.0.1 --port 5001 --reload
 npm run tauri dev
 ```
 
+
 ---
 
+## ⚠️ Hardware Limitations & Graceful Degradation
+
+Running the local `llama.cpp` server for AST query resolution is highly hardware-dependent. 
+On lower-end or older GPUs (e.g., **Nvidia GTX 1050**), LLM inference latency can be severely bottlenecked, sometimes exceeding 1-2 minutes per query.
+
+To ensure a seamless developer experience, Cascade implements **Graceful Degradation Fallbacks**:
+* **LLM Timeouts**: If the local model exceeds generation timeouts (60s for Explanations, 120s for Simulations), the query does not crash.
+* **Deterministic Fallback**: Cascade intercepts the timeout or empty response and instantly synthesizes a structured Markdown table derived purely from the graph metadata (callers, callees, hop-distance, risk level).
+* **Hybrid Routing**: Query intent classification is primarily handled by ultra-fast 0ms keyword matchers. The LLM zero-shot router (`IntentAgent`) is only invoked for highly ambiguous phrasing.
+
+---
 ## 💡 Usage
 
 ### Loading a Repository

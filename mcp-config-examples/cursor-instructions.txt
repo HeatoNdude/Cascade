@@ -1,0 +1,10 @@
+To add Cascade to Cursor:
+
+1. Open Cursor Settings (Ctrl/Cmd + ,)
+2. Go to "Features" > "MCP Servers"
+3. Click "+ Add New MCP Server"
+4. Fill in the details:
+   - Name: cascade
+   - Type: command
+   - Command: python D:\Projects\cascade\cascade\mcp_server.py --repo D:\Projects\cascade\cascade
+5. Click "Save"

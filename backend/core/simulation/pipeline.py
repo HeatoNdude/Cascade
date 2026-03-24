@@ -21,6 +21,8 @@ from core.simulation.agents import (
     run_synthesis_agent,
 )
 
+from core.simulation.classifier import classify_query, QueryIntent
+from core.simulation.explain_agent import run_explain
 
 def _sse(event: str, data: dict) -> str:
     """Format a single SSE message."""
@@ -32,6 +34,7 @@ async def run_simulation(
     repo_path: str,
     G: nx.DiGraph,
     llama_url: str,
+    vector_index=None,
 ) -> AsyncGenerator[str, None]:
     """
     Full simulation pipeline.
@@ -39,6 +42,15 @@ async def run_simulation(
     Uses a Queue so that synchronous agents (traversal, scoring)
     don't block SSE delivery to the client.
     """
+    # Classify query mode
+    intent = await classify_query(prompt, llama_url=llama_url)
+    if intent.mode == "investigate":
+        async for chunk in _explain_pipeline(
+            prompt, G, llama_url, vector_index
+        ):
+            yield chunk
+        return
+
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     async def _run():
@@ -186,8 +198,55 @@ async def run_simulation(
         if not task.done():
             task.cancel()
 
-    # Drain any remaining events
     while not queue.empty():
         event = queue.get_nowait()
         if event is not None:
             yield event
+
+
+async def _explain_pipeline(
+    prompt: str,
+    G: nx.DiGraph,
+    llama_url: str,
+    vector_index=None,
+) -> AsyncGenerator[str, None]:
+    """Investigative query pipeline — no blast radius."""
+    import time
+    start = time.time()
+
+    def sse(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+    yield sse("stage", {
+        "stage":   "explain",
+        "message": "Searching codebase…"
+    })
+
+    intent = classify_query(prompt)
+    intent.mode = "investigate"
+
+    result = await run_explain(intent, G, vector_index, llama_url)
+
+    yield sse("explain", {
+        "answer":       result["answer"],
+        "primary_node": result.get("primary_node", ""),
+        "nodes":        result.get("nodes", []),
+    })
+
+    elapsed = int((time.time() - start) * 1000)
+
+    yield sse("complete", {
+        "status":           "complete",
+        "mode":             "investigate",
+        "elapsed_ms":       elapsed,
+        "answer":           result["answer"],
+        "primary_node":     result.get("primary_node", ""),
+        "nodes":            result.get("nodes", []),
+        "seed_node_ids":    result.get("nodes", [])[:1],
+        "affected_nodes":   [],
+        "affected_tests":   [],
+        "report_markdown":  result["answer"],
+        "mermaid_graph":    "",
+        "total_breaks":     0,
+        "confidence_score": 1.0,
+    })

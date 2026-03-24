@@ -112,6 +112,8 @@ export default function SimulationPanel({ repoPath, onBlastRadius, onClear }: Pr
                 setStage(data.message)
               } else if (currentEvent === 'blast_radius') {
                 onBlastRadius(data.seed_node_ids, data.affected_nodes)
+              } else if (currentEvent === 'explain') {
+                setStage('Answer ready')
               } else if (currentEvent === 'complete') {
                 setResult(data as SimResult)
                 setStage('')
@@ -210,8 +212,10 @@ export default function SimulationPanel({ repoPath, onBlastRadius, onClear }: Pr
 
         {result && !running && (
           <span style={{ fontSize: '11px', color: '#64748b' }}>
-            {result.total_breaks} breaks · {result.elapsed_ms}ms ·{' '}
-            confidence {Math.round(result.confidence_score * 100)}%
+            {(result as any).mode === 'investigate'
+              ? `Explained · ${result.elapsed_ms}ms`
+              : `${result.total_breaks} breaks · ${result.elapsed_ms}ms · confidence ${Math.round(result.confidence_score * 100)}%`
+            }
           </span>
         )}
 
@@ -423,7 +427,13 @@ export default function SimulationPanel({ repoPath, onBlastRadius, onClear }: Pr
               whiteSpace:   showMermaid ? 'pre' : 'pre-wrap',
               fontFamily:   'monospace',
             }}>
-              {showMermaid ? result.mermaid_graph : result.report_markdown}
+              {showMermaid && result.mermaid_graph?.trim()
+                ? result.mermaid_graph
+                : (result.report_markdown?.trim()
+                    ? result.report_markdown
+                    : '*(No report generated)*'
+                  )
+              }
             </div>
           </div>
         </div>

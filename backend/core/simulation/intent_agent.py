@@ -55,12 +55,15 @@ Extract the intent as JSON:"""
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user",   "content": user_msg}
                     ],
-                    "max_tokens": 256,
+                    "max_tokens": 600,
                     "temperature": 0.1,
                 }
             )
             resp.raise_for_status()
             raw = resp.json()["choices"][0]["message"]["content"].strip()
+            
+        import re
+        raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
 
         # Extract JSON from response (model may add preamble)
         json_match = re.search(r'\{.*\}', raw, re.DOTALL)
@@ -78,13 +81,21 @@ Extract the intent as JSON:"""
     except Exception as e:
         # Fallback: simple keyword extraction
         print(f"[IntentAgent] LLM failed ({e}), using keyword fallback")
-        words = [w for w in state.prompt.split()
-                 if len(w) > 3 and w[0].isupper() or '_' in w]
+        import string
+        
+        # Clean prompt words: remove ?,., etc.
+        clean_words = [w.strip(string.punctuation) for w in state.prompt.split() if w]
+        
+        # Target heuristics: CamelCase, snake_case, kebab-case
+        words = [w for w in clean_words
+                 if len(w) > 3 and (w[0].isupper() or '_' in w or '-' in w)]
+                 
         # Match against known node names
         matched = [n for n in node_names
                    if any(w.lower() in n.lower()
-                          for w in state.prompt.split()
+                          for w in clean_words
                           if len(w) > 3)][:10]
+                          
         state.seed_event = SeedEvent(
             change_type  = "refactor",
             target_names = matched or words[:5],

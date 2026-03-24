@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "cascade": {
+      "command": "python",
+      "args": [
+        "D:\\Projects\\cascade\\cascade\\mcp_server.py",
+        "--repo",
+        "D:\\Projects\\cascade\\cascade"
+      ]
+    }
+  }
+}
