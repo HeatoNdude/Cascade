@@ -8,11 +8,11 @@ import os
 import pickle
 import numpy as np
 import faiss
-from sentence_transformers import SentenceTransformer
 import networkx as nx
 
 MODEL_NAME    = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384
+ENABLE_LOCAL  = os.getenv("ENABLE_LOCAL_EMBEDDINGS", "false").lower() == "true"
 
 
 class VectorIndex:
@@ -23,8 +23,11 @@ class VectorIndex:
         self.node_ids  = []
 
     def _load_model(self):
+        if not ENABLE_LOCAL:
+            return
         if self.model is None:
-            print("[Cascade] Loading embedding model...")
+            print("[Cascade] Loading embedding model (Local Resources)...")
+            from sentence_transformers import SentenceTransformer
             self.model = SentenceTransformer(MODEL_NAME)
             print("[Cascade] Embedding model ready.")
 
@@ -40,6 +43,10 @@ class VectorIndex:
         return " ".join(p for p in parts if p).strip()
 
     def build(self, G: nx.DiGraph):
+        if not ENABLE_LOCAL:
+            print("[Cascade] Local embeddings disabled. Skipping vector index build.")
+            return
+
         self._load_model()
         self.node_ids = []
         texts         = []
@@ -68,7 +75,7 @@ class VectorIndex:
         self._save_cache()
 
     def search(self, query: str, top_k: int = 10) -> list:
-        if self.index is None or not self.node_ids:
+        if not ENABLE_LOCAL or self.index is None or not self.node_ids:
             return []
         self._load_model()
         query_vec = self.model.encode(
