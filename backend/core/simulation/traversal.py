@@ -22,15 +22,33 @@ def find_seed_nodes(
 ) -> list[str]:
     """
     Find graph node IDs matching the target names.
-    Case-insensitive, partial match allowed.
+    Case-insensitive, partial match allowed across name, file, and docstring.
     """
     seeds = []
+    
+    # Normalize targets for looser matching
+    targets_clean = [t.lower().replace("_", "").replace("-", "") for t in target_names]
+    
     for node_id, data in G.nodes(data=True):
         node_name = data.get("name", "").lower()
-        for target in target_names:
-            if target.lower() in node_name or node_name in target.lower():
+        file_name = data.get("file", "").lower()
+        docstring = data.get("docstring", "").lower()
+        
+        # Combine searchable text for fallback
+        searchable_text = f"{node_name} {file_name} {docstring}"
+        
+        for target, target_clean in zip(target_names, targets_clean):
+            tgt = target.lower()
+            # 1. Direct substring match in name or file
+            if tgt in node_name or tgt in file_name:
                 seeds.append(node_id)
                 break
+                
+            # 2. If the stripped target (e.g. reacthottoast) is in the docstring or name
+            if len(target_clean) > 4 and target_clean in searchable_text.replace("_", "").replace("-", ""):
+                seeds.append(node_id)
+                break
+                
     return list(set(seeds))
 
 
@@ -50,18 +68,9 @@ def run_traversal(
     seeds = find_seed_nodes(G, state.seed_event.target_names)
 
     if not seeds:
-        # Broaden search with single words
-        for target in state.seed_event.target_names:
-            for part in target.split("_"):
-                if len(part) > 2:
-                    seeds.extend(find_seed_nodes(G, [part]))
-        seeds = list(set(seeds))
-
-    if not seeds:
-        state.error = (
-            f"No nodes found matching: {state.seed_event.target_names}. "
-            "Try a different name or check the graph is loaded."
-        )
+        print(f"[Traversal] No nodes found matching {state.seed_event.target_names}. Assuming new additions with 0 baseline blast radius.")
+        state.seed_node_ids = []
+        state.traversal_result = []
         return state
 
     state.seed_node_ids = seeds[:10]  # cap seeds
