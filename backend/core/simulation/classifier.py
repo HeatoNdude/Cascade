@@ -52,29 +52,35 @@ class QueryIntent:
     raw_prompt: str
 
 
-async def classify_query(prompt: str, llama_url: str = None) -> QueryIntent:
+async def classify_query(prompt: str, llama_url: str = None, api_key: str = "", model_name: str = "local") -> QueryIntent:
     lower = prompt.lower().strip()
     target = _extract_target(prompt)
 
     # 1. Fast heuristic keyword check
     for pattern in SIMULATE_PATTERNS:
         if pattern in lower:
-            return QueryIntent("simulate", target, prompt)
+            return QueryIntent(mode="simulate", target=target, raw_prompt=prompt)
 
     for pattern in INVESTIGATE_PATTERNS:
         if pattern in lower:
-            return QueryIntent("investigate", target, prompt)
+            return QueryIntent(mode="investigate", target=target, raw_prompt=prompt)
 
     # 2. LLM Smart Fallback
     mode = "simulate" # default if everything fails
     if llama_url:
         try:
             system = "You classify developer queries into two categories: 'SIMULATE' (asking what happens if code changes) or 'INVESTIGATE' (asking how existing code works). Reply with exactly 1 word: SIMULATE or INVESTIGATE."
+            
+            headers = {}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
-                    f"{llama_url}/v1/chat/completions",
+                    f"{llama_url}/chat/completions" if "/v1" in llama_url else f"{llama_url}/v1/chat/completions",
+                    headers=headers,
                     json={
-                        "model": "local",
+                        "model": model_name,
                         "messages": [
                             {"role": "system", "content": system},
                             {"role": "user", "content": prompt}

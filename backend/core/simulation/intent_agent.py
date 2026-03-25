@@ -26,42 +26,51 @@ Example output:
 {"change_type":"replace","target_names":["Redis","RedisClient","cache_set","cache_get"],"description":"Replace Redis with Dragonfly as the caching backend","scope":"cross-module"}"""
 
 
-async def run_intent_agent(
-    state: SimulationState,
-    llama_url: str,
-    node_names: list[str]
-) -> SimulationState:
+async def run_intent_agent(state: SimulationState, llama_url: str, api_key: str = "", model_name: str = "local", node_names: list[str] = None) -> SimulationState:
     """
-    Calls local LLM to parse the prompt into a SeedEvent.
-    node_names: list of all node names in the graph (for context).
+    Zero-shot parse logic.
+    1) Determine if the change intends to "refactor", "remove", "add", "modify".
+    2) Extract the likely target nodes from the user's string.
     """
-    # Give the LLM context about what exists in the graph
-    # Limit to 150 names to avoid context overflow on 4B model
-    name_sample = node_names[:150]
-    user_msg = f"""Available code entities in this codebase:
-{', '.join(name_sample)}
+    print(f"[IntentAgent] Asking local LLM to parse intent for: {state.prompt[:50]}...")
 
-Change request: {state.prompt}
+    val_nodes = ""
+    if node_names:
+        # Give LLM a hint of valid known nodes
+        val_nodes = f"Known valid node names include: {', '.join(node_names[:100])} (truncated if too long)."
 
-Extract the intent as JSON:"""
+    prompt = f"""
+    You are an AI tasked with parsing a developer's simulation request.
+    {val_nodes}
+
+    User prompt: "{state.prompt}"
+
+    Return JSON matching this schema:
+    {{
+      "change_type": "refactor" | "remove" | "add" | "modify",
+      "target_names": ["list", "of", "exact", "node", "names"],
+      "description": "Short reasoning"
+    }}
+
+    Output ONLY JSON. Do not output markdown, no backticks, no thinking tags.
+    """
+
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                f"{llama_url}/v1/chat/completions",
+                f"{llama_url}/chat/completions" if "/v1" in llama_url else f"{llama_url}/v1/chat/completions",
+                headers=headers,
                 json={
-                    "model": "local",
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user",   "content": user_msg}
-                    ],
-                    "max_tokens": 600,
-                    "temperature": 0.1,
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.0,
+                    "max_tokens": 150,
                 }
             )
-            resp.raise_for_status()
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            
         import re
         raw = re.sub(r'<think>.*?</think>', '', raw, flags=re.DOTALL).strip()
 

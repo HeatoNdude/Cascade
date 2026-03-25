@@ -1,15 +1,19 @@
 import json
 import os
+from dotenv import load_dotenv
+
+# Load from .env file if it exists in backend/
+load_dotenv()
 
 SETTINGS_PATH = r"D:\Projects\cascade\cascade\settings.json"
 
 DEFAULT_SETTINGS = {
     "llm_backend": "local",
-    "openrouter_key": "",
-    "openrouter_model": "qwen/qwen-2.5-72b-instruct",
+    "openrouter_key": os.getenv("LLM_API_KEY", ""),
+    "openrouter_model": os.getenv("LLM_MODEL", "qwen/qwen-2.5-72b-instruct"),
     "local_model_path": r"C:\llm\models\Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
     "llama_cpp_path": r"C:\llm",
-    "llama_server_url": "http://127.0.0.1:8080",
+    "llama_server_url": os.getenv("LLM_BASE_URL", "http://127.0.0.1:8080"),
     "n_gpu_layers": 28,
     "max_repo_files": 5000,
     "supported_langs": ["python", "typescript", "javascript"],

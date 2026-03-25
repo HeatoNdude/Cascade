@@ -15,6 +15,8 @@ async def run_explain(
     G: nx.DiGraph,
     vector_index,
     llama_url: str,
+    api_key: str = "",
+    model_name: str = "local"
 ) -> dict:
     """
     Finds target node, reads context, generates answer.
@@ -101,13 +103,18 @@ async def run_explain(
         f"Code metadata:\n{json.dumps(context, indent=2)}"
     )
 
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
     answer = ""
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
-                f"{llama_url}/v1/chat/completions",
+                f"{llama_url}/chat/completions" if "/v1" in llama_url else f"{llama_url}/v1/chat/completions",
+                headers=headers,
                 json={
-                    "model":       "local",
+                    "model":       model_name,
                     "messages":    [
                         {"role": "system", "content": system},
                         {"role": "user",   "content": user}

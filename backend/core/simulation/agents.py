@@ -138,7 +138,9 @@ def _build_mermaid(state: SimulationState) -> str:
 
 async def run_synthesis_agent(
     state: SimulationState,
-    llama_url: str
+    llama_url: str,
+    api_key: str = "",
+    model_name: str = "local"
 ) -> SimulationState:
     """
     Writes the cited impact report using local LLM.
@@ -173,12 +175,17 @@ Max 200 words. Be direct. Cite function names and files. No preamble."""
 
     user = f"Impact analysis data:\n{json.dumps(context, indent=2)}"
 
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
     try:
         async with httpx.AsyncClient(timeout=120) as client:
             resp = await client.post(
-                f"{llama_url}/v1/chat/completions",
+                f"{llama_url}/chat/completions" if "/v1" in llama_url else f"{llama_url}/v1/chat/completions",
+                headers=headers,
                 json={
-                    "model": "local",
+                    "model": model_name,
                     "messages": [
                         {"role": "system", "content": system},
                         {"role": "user",   "content": user}

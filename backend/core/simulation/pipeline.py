@@ -34,6 +34,8 @@ async def run_simulation(
     repo_path: str,
     G: nx.DiGraph,
     llama_url: str,
+    api_key: str = "",
+    model_name: str = "local",
     vector_index=None,
 ) -> AsyncGenerator[str, None]:
     """
@@ -43,10 +45,10 @@ async def run_simulation(
     don't block SSE delivery to the client.
     """
     # Classify query mode
-    intent = await classify_query(prompt, llama_url=llama_url)
+    intent = await classify_query(prompt, llama_url=llama_url, api_key=api_key, model_name=model_name)
     if intent.mode == "investigate":
         async for chunk in _explain_pipeline(
-            prompt, G, llama_url, vector_index
+            prompt, G, llama_url, api_key, model_name, vector_index
         ):
             yield chunk
         return
@@ -66,7 +68,7 @@ async def run_simulation(
                 d.get("name", "") for _, d in G.nodes(data=True)
                 if d.get("type") != "module"
             ]
-            state = await run_intent_agent(state, llama_url, node_names)
+            state = await run_intent_agent(state, llama_url, api_key, model_name, node_names)
             if state.error:
                 await queue.put(_sse("error", {"message": state.error}))
                 return
@@ -138,7 +140,7 @@ async def run_simulation(
 
         # ── Stage 5: SynthesisAgent ───────────────────────────────
         try:
-            state = await run_synthesis_agent(state, llama_url)
+            state = await run_synthesis_agent(state, llama_url, api_key, model_name)
         except Exception as e:
             state.report_markdown = f"Report generation failed: {e}"
             state.confidence_score = 0.5
@@ -208,6 +210,8 @@ async def _explain_pipeline(
     prompt: str,
     G: nx.DiGraph,
     llama_url: str,
+    api_key: str = "",
+    model_name: str = "local",
     vector_index=None,
 ) -> AsyncGenerator[str, None]:
     """Investigative query pipeline — no blast radius."""
@@ -225,7 +229,7 @@ async def _explain_pipeline(
     intent = classify_query(prompt)
     intent.mode = "investigate"
 
-    result = await run_explain(intent, G, vector_index, llama_url)
+    result = await run_explain(intent, G, vector_index, llama_url, api_key, model_name)
 
     yield sse("explain", {
         "answer":       result["answer"],

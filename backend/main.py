@@ -291,6 +291,8 @@ async def simulate(req: SimulateRequest):
 
     repo_path = req.repo_path or cascade.repo_path or ""
     llama_url = settings.get("llama_server_url", "http://127.0.0.1:8080")
+    api_key   = settings.get("openrouter_key", "")
+    model_name= settings.get("openrouter_model", "local")
 
     async def event_generator():
         async for chunk in run_simulation(
@@ -298,6 +300,8 @@ async def simulate(req: SimulateRequest):
             repo_path=repo_path,
             G=cascade.builder.G,
             llama_url=llama_url,
+            api_key=api_key,
+            model_name=model_name,
             vector_index=cascade.vector,
         ):
             yield chunk
