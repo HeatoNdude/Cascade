@@ -173,6 +173,9 @@ async def run_synthesis_agent(
 Use these sections only: ## Summary, ## High Risk, ## Tests at Risk, ## Recommendation
 Max 200 words. Be direct. Cite function names and files. No preamble."""
 
+    if not state.affected_nodes:
+        system += " If total_affected is 0, state that the target is used in isolation and is safe to swap. Provide a brief code snippet showing how to swap the import."
+
     user = f"Impact analysis data:\n{json.dumps(context, indent=2)}"
 
     headers = {}
@@ -202,55 +205,72 @@ Max 200 words. Be direct. Cite function names and files. No preamble."""
                 raise ValueError("LLM returned empty response")
     except Exception as e:
         # Fallback: generate report from structured data
-        lines = [
-            f"## Impact Report: {state.seed_event.description}",
-            "",
-            f"**{state.total_breaks} functions at risk** across "
-            f"{len(state.affected_nodes)} total affected nodes.",
-        ]
+        if len(state.affected_nodes) == 0:
+            target_str = state.seed_event.target_names[0] if state.seed_event.target_names else "The target"
+            lines = [
+                f"## Impact Report: {state.seed_event.description}",
+                "",
+                f"**0 functions at risk** across 0 total affected nodes.",
+                "",
+                "### 💡 Recommendation",
+                f"`{target_str}` is used in isolation with no dependents. Safe to swap. Here are the import lines to replace:",
+                "```typescript",
+                "// remove",
+                f'import {{ toast }} from "{target_str}"',
+                "// add  ",
+                f'import toast from "new-package"',
+                "```"
+            ]
+        else:
+            lines = [
+                f"## Impact Report: {state.seed_event.description}",
+                "",
+                f"**{state.total_breaks} functions at risk** across "
+                f"{len(state.affected_nodes)} total affected nodes.",
+            ]
 
-        if red_nodes:
-            lines.extend(["", "### 🔴 High Risk (direct breaks)"])
-            for n in red_nodes[:8]:
-                lines.append(
-                    f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
-                    f" — {n.break_reason}"
-                )
+            if red_nodes:
+                lines.extend(["", "### 🔴 High Risk (direct breaks)"])
+                for n in red_nodes[:8]:
+                    lines.append(
+                        f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
+                        f" — {n.break_reason}"
+                    )
 
-        if amber_nodes:
-            lines.extend(["", "### 🟡 Medium Risk (indirect breaks)"])
-            for n in amber_nodes[:8]:
-                lines.append(
-                    f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
-                    f" — {n.break_reason}"
-                )
+            if amber_nodes:
+                lines.extend(["", "### 🟡 Medium Risk (indirect breaks)"])
+                for n in amber_nodes[:8]:
+                    lines.append(
+                        f"- **{n.name}** `{n.file}` (hop {n.hop_distance})"
+                        f" — {n.break_reason}"
+                    )
 
-        if green_nodes:
+            if green_nodes:
+                lines.extend([
+                    "",
+                    f"### 🟢 Low Risk ({len(green_nodes)} nodes — "
+                    f"unlikely to break but in dependency chain)"
+                ])
+
+            if state.affected_tests:
+                lines.extend(["", "### 🧪 Tests at Risk"])
+                for t in state.affected_tests[:8]:
+                    lines.append(f"- `{t['name']}` in `{t['file']}`")
+
+            if state.history_notes:
+                lines.extend(["", "### 📜 Historical Precedent"])
+                for h in state.history_notes[:3]:
+                    lines.append(
+                        f"- `{h['hash']}` {h['date']} by {h['author']}: "
+                        f"{h['message'][:100]}"
+                    )
+
             lines.extend([
                 "",
-                f"### 🟢 Low Risk ({len(green_nodes)} nodes — "
-                f"unlikely to break but in dependency chain)"
+                "### 💡 Recommendation",
+                f"Update all {len(red_nodes) + len(amber_nodes)} call sites "
+                f"before merging. Run the full test suite after renaming."
             ])
-
-        if state.affected_tests:
-            lines.extend(["", "### 🧪 Tests at Risk"])
-            for t in state.affected_tests[:8]:
-                lines.append(f"- `{t['name']}` in `{t['file']}`")
-
-        if state.history_notes:
-            lines.extend(["", "### 📜 Historical Precedent"])
-            for h in state.history_notes[:3]:
-                lines.append(
-                    f"- `{h['hash']}` {h['date']} by {h['author']}: "
-                    f"{h['message'][:100]}"
-                )
-
-        lines.extend([
-            "",
-            "### 💡 Recommendation",
-            f"Update all {len(red_nodes) + len(amber_nodes)} call sites "
-            f"before merging. Run the full test suite after renaming."
-        ])
 
         state.report_markdown = "\n".join(lines)
         print(f"[SynthesisAgent] LLM failed ({e}), used fallback report.")
