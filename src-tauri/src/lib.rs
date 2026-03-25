@@ -13,7 +13,7 @@ fn start_python_backend() {
                 "-m", "uvicorn",
                 "main:app",
                 "--host", "127.0.0.1",
-                "--port", "5001",
+                "--port", "8000",
                 "--reload"
             ])
             .current_dir(backend_dir)
@@ -27,27 +27,9 @@ fn start_python_backend() {
     thread::sleep(Duration::from_secs(3));
 }
 
-fn start_llama_server() {
-    thread::spawn(|| {
-        let llama_server = r"C:\llm\llama-server.exe";
-        let mut child = Command::new(llama_server)
-            .args(&[
-                "--model", r"C:\llm\models\Qwen3.5-4B-Q4_K_M.gguf",
-                "--n-gpu-layers", "28",
-                "--ctx-size", "4096",
-                "--port", "8080",
-                "--host", "127.0.0.1"
-            ])
-            .spawn()
-            .expect("[Cascade] Failed to start llama-server.exe");
-
-        child.wait().expect("[Cascade] llama-server process exited unexpectedly");
-    });
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    start_llama_server();
     start_python_backend();
 
     // Allow servers time to initialise before Tauri window loads
